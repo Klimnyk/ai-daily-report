@@ -1,0 +1,40 @@
+name: Daily Productivity Report
+
+on:
+  schedule:
+    # Run daily at 18:00 Kyiv time (UTC+3)
+    # In CRON expression: minute hour day month day_of_week
+    - cron: '0 15 * * *'  # 15:00 UTC = 18:00 Kyiv time
+  workflow_dispatch:  # Allows manual triggering through GitHub UI
+
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Run daily report generator
+      env:
+          CLOCKIFY_API_KEY: ${{ secrets.CLOCKIFY_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_USERNAME: ${{ secrets.GH_USERNAME }}
+          GITHUB_PROJECT_ID: ${{ secrets.GH_PROJECT_ID }}
+          GITHUB_PROJECT_NUMBER: ${{ secrets.GH_PROJECT_NUMBER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          RECIPIENT_EMAILS: ${{ secrets.RECIPIENT_EMAILS }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      run: python main.py
