@@ -4,7 +4,7 @@ on:
   schedule:
     # Run daily at 18:00 Kyiv time (UTC+3)
     # In CRON expression: minute hour day month day_of_week
-    - cron: '0 15 * * *'  # 15:00 UTC = 18:00 Kyiv time
+    - cron: '0 15 * * 1-5'  # 15:00 UTC = 18:00 Kyiv time
   workflow_dispatch:  # Allows manual triggering through GitHub UI
 
 
