@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: ./github/actions/checkout
+      uses: actions/checkout@v3
     
     - name: Set up Python 3.10
-      uses: ./github/actions/setup-python
+      uses: actions/setup-python@v4
       with:
         python-version: "3.10"
     - name: Install dependencies
