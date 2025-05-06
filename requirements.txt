@@ -1,0 +1,8 @@
+aiohttp
+python-dotenv
+requests
+httpx
+openai
+pydantic
+schedule
+jinja2
