@@ -42,7 +42,7 @@ async def generate_daily_report():
         clockify_data = await get_formatted_today_time_entries()
         # Check if Clockify data is empty - skip report generation and email sending
 
-        if (not clockify_data or len(clockify_data) == 0) and github_data["tasks"] == 0:
+        if (not clockify_data or len(clockify_data) == 0):
             logger.info("No Clockify time entries found for today. Skipping report generation and email.")
             return None
         
