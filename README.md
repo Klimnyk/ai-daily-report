@@ -4,6 +4,7 @@ This project automatically collects personal productivity data from GitHub and C
 
 ## Setup Instructions
 
+
 ### 1. Create a GitHub Repository
 
 - Create a new GitHub repository
