@@ -124,8 +124,7 @@ class ReportGenerator:
                     "messages": [
                         {"role": "system", "content": system_role},
                         {"role": "user", "content": prompt}
-                    ],
-                    "temperature": float(os.getenv("OPENAI_TEMPERATURE", 0.3))
+                    ]
                 }
                 
                 logger.info("Sending data to OpenAI for report generation...")
