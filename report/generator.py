@@ -1,16 +1,17 @@
 import asyncio
 import os
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 
-import httpx
 from dotenv import load_dotenv
 
 # Import correctly - add sys.path modification to handle relative imports
 import sys
 from pathlib import Path
+
+from openai import AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -33,43 +34,47 @@ class ReportGenerator:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OpenAI API key not provided and not found in environment variables")
-        
-        self.api_url = "https://api.openai.com/v1/chat/completions"
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    
-    def _load_prompt_template(self) -> str:
-        """Load the prompt template from the markdown file."""
+
+        # Використовуємо gpt-5-mini за замовчуванням (можна перевизначити через OPENAI_MODEL)
+        self.model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+
+        # Async OpenAI client (Responses API під капотом)
+        # Намірено не передаємо temperature/max_tokens — вони не підтримуються
+        self.client = AsyncOpenAI(api_key=self.api_key, timeout=60.0)
+
+    def _load_prompt_template(self) -> Tuple[str, str]:
+        """Load the prompt and system role templates from markdown files."""
         prompt_path = Path(project_root) / "promt.md"
-        system_role = Path(project_root) / "system_role.md"
-        
+        system_role_path = Path(project_root) / "system_role.md"
+
+        prompt = ""
+        system_role = ""
+
         if not prompt_path.exists():
             logger.warning(f"Prompt template file not found: {prompt_path}")
-            return ""
-        
-        with open(prompt_path, 'r', encoding='utf-8') as f:
-            # Skip the first line which is the filepath comment
-            lines = f.readlines()
-            if lines and lines[0].startswith('<!-- filepath:'):
-                prompt = ''.join(lines[1:])
-            else:
-                prompt = ''.join(lines)
+        else:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                if lines and lines[0].startswith('<!-- filepath:'):
+                    prompt = ''.join(lines[1:])
+                else:
+                    prompt = ''.join(lines)
 
-        if not system_role.exists():
-            logger.warning(f"System role file not found: {system_role}")
-            return ""
-        
-        with open(system_role, 'r', encoding='utf-8') as f:
-            # Skip the first line which is the filepath comment
-            lines = f.readlines()
-            if lines and lines[0].startswith('<!-- filepath:'):
-                system_role = ''.join(lines[1:])
-            else:
-                system_role = ''.join(lines)                
+        if not system_role_path.exists():
+            logger.warning(f"System role file not found: {system_role_path}")
+        else:
+            with open(system_role_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                if lines and lines[0].startswith('<!-- filepath:'):
+                    system_role = ''.join(lines[1:])
+                else:
+                    system_role = ''.join(lines)
+
         return prompt, system_role
 
     def format_github_data(self, github_data: Dict[str, Any]) -> str:
         github_text = "## GitHub Activity:\n\n"
-        
+
         tasks = github_data.get('tasks', [])
 
         if tasks:
@@ -82,7 +87,7 @@ class ReportGenerator:
                 github_text += f"- {name} ({status}, {state}): {description}\n"
             github_text += "\n"
         commits = github_data.get('commits', [])
-        
+
         if commits:
             github_text += "### Commits:\n"
             for commit in commits:
@@ -92,8 +97,17 @@ class ReportGenerator:
                 github_text += f"- [{repo}] {message} ({date})\n"
             github_text += "\n"
         return github_text
-    
-    
+
+    def _build_prompt(self, formatted_github: str, formatted_clockify: List[Dict[str, Any]], prompt_template: str) -> str:
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        return f"""
+{formatted_github}
+
+{formatted_clockify}
+
+{prompt_template.format(date=current_date)}
+""".strip()
+
     async def generate_report(self,
                               github_data: Dict[str, Any],
                               clockify_data: List[Dict[str, Any]]) -> str:
@@ -111,7 +125,9 @@ class ReportGenerator:
             {"role": "user", "content": user_prompt}
         ]
 
-        reasoning = {"effort": 'low'} 
+        # Опційно: можна керувати рівнем "reasoning effort" через ENV, інакше не додаємо
+        reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT", "").strip().lower()
+        reasoning = {"effort": reasoning_effort} if reasoning_effort in {"low", "medium", "high"} else None
 
         try:
             logger.info("Sending data to OpenAI for report generation...")
@@ -149,21 +165,15 @@ class ReportGenerator:
             return generated_report + disclaimer
 
         except Exception as e:
+            # Додаткове логування помилки
             logger.error(f"Error generating report: {repr(e)}")
             return f"Error generating report: {repr(e)}"
-    
+
     async def generate_report_from_raw_data(self, raw_data: Dict[str, Any], ) -> str:
         """
         Generate a report directly from raw data. This is a convenience method when
         data is already pre-processed elsewhere.
-        
-        Args:
-            raw_data: Dictionary containing all necessary data already formatted
-            
-        Returns:
-            Generated report as string
         """
-
         return await self.generate_report(
             github_data=raw_data.get('github_data', {}),
             clockify_data=raw_data.get('clockify_data', []),
@@ -178,17 +188,18 @@ async def main():
             "tasks": tasks,
             "commits": commits
         }
-        
+
         # Get Clockify data
         clockify_data = await get_formatted_today_time_entries()
-        
+
+        logger.info("Generating report using OpenAI...")
         generator = ReportGenerator()
         report = await generator.generate_report(
             github_data=github_data,
             clockify_data=clockify_data,
         )
         print(report)
-    
+
     except Exception as e:
         logger.error(f"Error in main function: {e}")
         raise
