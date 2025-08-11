@@ -94,62 +94,63 @@ class ReportGenerator:
         return github_text
     
     
-    async def generate_report(self, 
-                       github_data: Dict[str, Any], 
-                       clockify_data: List[Dict[str, Any]]) -> str:
-            
+    async def generate_report(self,
+                              github_data: Dict[str, Any],
+                              clockify_data: List[Dict[str, Any]]) -> str:
         formatted_github = self.format_github_data(github_data)
         formatted_clockify = clockify_data
-        
+
         # Load prompt template and format with current date
-        prompt_template , system_role = self._load_prompt_template()
-        current_date = datetime.now().strftime('%Y-%m-%d')
-        prompt = f"""
-        {formatted_github}
-        
-        {formatted_clockify}
-        
-        {prompt_template.format(date=current_date)}
-        """
-        
+        prompt_template, system_role = self._load_prompt_template()
+        user_prompt = self._build_prompt(formatted_github, formatted_clockify, prompt_template)
+
+        # Побудова запиту як у вашому прикладі з офіційної документації
+        # role=developer — це системні інструкції; role=user — ваші дані та запит
+        messages = [
+            {"role": "developer", "content": system_role or "You are an assistant that writes concise, structured daily productivity reports."},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        reasoning = {"effort": 'low'} 
+
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                payload = {
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system_role},
-                        {"role": "user", "content": prompt}
-                    ]
-                }
-                
-                logger.info("Sending data to OpenAI for report generation...")
-                response = await client.post(self.api_url, headers=headers, json=payload)
-                
-                if response.status_code != 200:
-                    logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
-                    return f"Error generating report: {response.status_code} - {response.text}"
-                
-                response_data = response.json()
+            logger.info("Sending data to OpenAI for report generation...")
+            response = await self.client.responses.create(
+                model=self.model,
+                input=messages if messages else user_prompt,
+                **({"reasoning": reasoning} if reasoning else {})
+            )
 
-                generated_report = response_data['choices'][0]['message']['content'].strip()
-                logger.info("Successfully generated productivity report")
+            # Простіший спосіб отримати текст
+            generated_report = (response.output_text or "").strip()
+            if not generated_report:
+                # На випадок, якщо output_text відсутній — пройдемося по структурі
+                try:
+                    if getattr(response, "output", None):
+                        for blk in response.output:
+                            for c in getattr(blk, "content", []) or []:
+                                if getattr(c, "type", "") in ("output_text", "text") and getattr(c, "text", ""):
+                                    generated_report = c.text.strip()
+                                    break
+                            if generated_report:
+                                break
+                except Exception:
+                    pass
 
+            if not generated_report:
+                logger.error(f"Unable to parse OpenAI response format: {response}")
+                return "Error generating report: Unrecognized response format from model"
 
-                disclaimer = (
-                    f"\n\n---\n*This report was generated using AI based on task statistics and monitoring metrics.*\n"
-                    f"Model used: OpenAI {self.model}"
-                )
-                generated_report += disclaimer
-                return generated_report
-                
+            logger.info("Successfully generated productivity report")
+            disclaimer = (
+                f"\n\n---\n*This report was generated using AI based on task statistics and monitoring metrics.*\n"
+                f"Model used: OpenAI {self.model}"
+            )
+            return generated_report + disclaimer
+
         except Exception as e:
-            logger.error(f"Error generating report: {str(e)}")
-            return f"Failed to generate report: {str(e)}"
+            logger.error(f"Error generating report: {repr(e)}")
+            return f"Error generating report: {repr(e)}"
     
     async def generate_report_from_raw_data(self, raw_data: Dict[str, Any], ) -> str:
         """
