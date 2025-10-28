@@ -2,7 +2,7 @@ name: Daily Productivity Report
 
 on:
   schedule:
-    - cron: '0 15 * * 1-5'  # 15:00 UTC = 18:00 Kyiv time
+    - cron: '0 16 * * 1-5'  # 16:00 UTC = 19:00 Kyiv time
   workflow_dispatch:
 
 jobs:
