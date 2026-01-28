@@ -23,10 +23,11 @@ from clockify.client import get_formatted_today_time_entries
 from report.generator import ReportGenerator
 from mailer.sender import EmailSender
 
-# Configure logging
+# Configure logging - respect LOG_LEVEL env for production
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(levelname)s - %(message)s" if log_level == "WARNING" else "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 

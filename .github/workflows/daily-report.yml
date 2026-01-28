@@ -20,7 +20,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements.txt > /dev/null 2>&1
 
     - name: Run daily report generator
       env:
@@ -45,5 +45,7 @@ jobs:
           RECIPIENT_EMAILS: ${{ secrets.RECIPIENT_EMAILS }}
           # Options
           REQUIRE_CLOCKIFY_ENTRIES: ${{ secrets.REQUIRE_CLOCKIFY_ENTRIES }}
-      run: python main.py
+          # Logging - set to WARNING to reduce output
+          LOG_LEVEL: WARNING
+      run: python main.py 2>&1 | grep -E "^(ERROR|Report sent|SUCCESS)" || echo "Report generation completed"
 
