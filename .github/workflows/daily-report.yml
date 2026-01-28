@@ -1,0 +1,50 @@
+name: Daily Productivity Report
+
+on:
+  schedule:
+    - cron: '0 16 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Set up Python 3.11 and install dependencies
+      run: |
+        uv venv --python 3.11
+        uv pip install -r requirements.txt -q
+
+    - name: Run daily report generator
+      env:
+          # Clockify
+          CLOCKIFY_API_KEY: ${{ secrets.CLOCKIFY_API_KEY }}
+          # GitLab
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_URL: ${{ secrets.GITLAB_URL }}
+          # Jira
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          # OpenAI
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          OPENAI_PROMPT_ID: ${{ secrets.OPENAI_PROMPT_ID }}
+          # Email
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          RECIPIENT_EMAILS: ${{ secrets.RECIPIENT_EMAILS }}
+          # Options
+          REQUIRE_CLOCKIFY_ENTRIES: ${{ secrets.REQUIRE_CLOCKIFY_ENTRIES }}
+          # Logging - set to WARNING to reduce output
+          LOG_LEVEL: WARNING
+      run: uv run python main.py
+

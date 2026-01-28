@@ -1,0 +1,16 @@
+# HTTP clients
+httpx>=0.27.0
+aiohttp>=3.9.0
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# OpenAI
+openai>=1.50.0
+
+# Templating (optional)
+jinja2>=3.1.0
+
+# Scheduling (optional)
+schedule>=1.2.0
